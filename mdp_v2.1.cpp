@@ -1,8 +1,7 @@
-// market data producer consumer mdp v2// 08.06.26// ZeroK
+// market data producer consumer mdp v2// 09.06.26// ZeroK
 
 /* workflow: producer thread -> ring buffer -> consumer thread -> stdout 
- * single producer = use load/store = mov add mov
- * multiple consumers = use fetch_add = rmw op = lockxdd
+ * depth = no. of slots needed to be consumed
  * */
 
 #include <cstdint>
