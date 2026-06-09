@@ -1,7 +1,8 @@
 // market data producer consumer mdp v2// 08.06.26// ZeroK
 
 /* workflow: producer thread -> ring buffer -> consumer thread -> stdout 
- *
+ * single producer = use load/store = mov add mov
+ * multiple consumers = use fetch_add = rmw op = lockxdd
  * */
 
 #include <cstdint>
@@ -10,7 +11,7 @@
 #include <cinttypes>    // for PRIu64/32
 #include <cstring>
 
-#include <random>   // for std::mt19937
+#include <random>       // for std::mt19937
 #include <chrono>
 
 #include <thread>
@@ -21,6 +22,7 @@
 #include <signal.h>
 
 #include "ring_buffer_v2.1.hpp"
+#include "thread_pinning.hpp"
 
 
 // for graceful shutdown on ctrl + c
@@ -42,7 +44,7 @@ struct alignas(64) Tick {
     std::uint32_t ask_qty;
 
     char symbol[8];
-    char pad[16];
+    char pad[16];                   // make the size of Tick to 64 byte
 
 };
 
@@ -52,12 +54,16 @@ constexpr int MAX_SIZE { 0x400 };   // 1024
 alignas(64) zerok::z_ring<Tick, MAX_SIZE> ring;
 
 alignas(64) std::atomic<std::uint64_t> produced { 0 };
+char pad0 [64 - sizeof(std::atomic<std::uint64_t>)]; 
+
 alignas(64) std::atomic<std::uint64_t> prev_produced { 0 };
 char pad1 [64 - sizeof(std::atomic<std::uint64_t>)]; 
 
 alignas(64) std::atomic<std::uint64_t> consumed { 0 };
-alignas(64) std::atomic<std::uint64_t> prev_consumed { 0 };
 char pad2 [64 - sizeof(std::atomic<std::uint64_t>)]; 
+
+alignas(64) std::atomic<std::uint64_t> prev_consumed { 0 };
+char pad3 [64 - sizeof(std::atomic<std::uint64_t>)]; 
 
 
 // market data generator MDG class 
@@ -109,6 +115,8 @@ Tick MDG::generate() {
 // producer thread
 void producer () {
     
+    pin_thread (0);
+
     MDG gen;
     while (RUNNING) {
         Tick tick = gen.generate ();
@@ -126,6 +134,8 @@ void producer () {
 alignas(64) std::atomic<std::uint64_t> latency_ns { 0 };
 void consumer () {
     
+    pin_thread (1);
+
     Tick tick;
     std::uint64_t expected { 1 };
 
@@ -137,13 +147,13 @@ void consumer () {
 
         if (tick.seq != expected) {
             std::printf ("gap expected : %" PRIu64
-                         "got : %" PRIu64 "\n", expected, tick.seq);
+                         "got : %" PRIu64 "\n\n", expected, tick.seq);
 
+            expected = tick.seq + 1;
         }
+        else ++expected;
 
-        consumed.fetch_add (1, std::memory_order_relaxed);
-
-        expected += tick.seq + 1;
+        consumed.fetch_add (1, std::memory_order_relaxed);  
 
         auto now_ns = std::chrono::duration_cast<
                         std::chrono::nanoseconds>(
@@ -167,27 +177,30 @@ int main () {
     std::thread pt (producer);
     std::thread ct (consumer);
 
-    auto prod_now = produced.load (std::memory_order_relaxed);
-    auto cons_now = consumed.load (std::memory_order_relaxed);
-
-    auto prod_rate = prod_now - prev_produced.load (std::memory_order_relaxed);
-    auto cons_rate = cons_now - prev_consumed.load (std::memory_order_relaxed);
-
-    prev_produced.store (prod_now, std::memory_order_release);
-    prev_consumed.store (cons_now, std::memory_order_release);
-
     while (RUNNING) {
+        
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-    
+        
+        auto prod_now = produced.load (std::memory_order_relaxed);
+        auto cons_now = consumed.load (std::memory_order_relaxed);
+
+        auto prod_rate = prod_now - prev_produced.load (std::memory_order_relaxed);
+        auto cons_rate = cons_now - prev_consumed.load (std::memory_order_relaxed);
+
+        prev_produced.store (prod_now, std::memory_order_relaxed);
+        prev_consumed.store (cons_now, std::memory_order_relaxed);
+
+   
         std::printf ("produced/s : %" PRIu64 "\n"
                      "consumed/s : %" PRIu64 "\n"
-                     "depth    : %zu\n",
-                     // "latency  : %" PRIu64 "\n\n",
-                    prev_produced.load (std::memory_order_relaxed),
-                    prev_consumed.load (std::memory_order_relaxed),
+                     "depth      : %zu\n\n",
+                    prod_rate,
+                    cons_rate,
                     ring.size()
-                    // latency_ns
                 );
+        
+        // std::printf ("latency    : %" PRIu64 "\n\n",
+        //             latency_ns.load (std::memory_order_relaxed));
     }
 
     pt.join();
