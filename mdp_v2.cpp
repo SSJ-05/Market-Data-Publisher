@@ -119,9 +119,10 @@ void producer () {
 
     MDG gen;
     while (RUNNING) {
-        Tick tick = gen.generate ();
+        Tick tick = gen.generate ();    // generate unconditionally
 
         while (!ring.push(tick)) {
+            if (!RUNNING) return;
             _mm_pause();
         }
         
@@ -139,10 +140,10 @@ void consumer () {
     Tick tick;
     std::uint64_t expected { 1 };
 
-    while (RUNNING) {
+    while (RUNNING || ring.empty()) {       // drain remaining ticks after shutdown
         while (!ring.pop(tick)) {
+            if (!RUNNING && ring.empty()) return;
             _mm_pause();
-            continue;
         }
 
         if (tick.seq != expected) {
