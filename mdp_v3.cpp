@@ -29,7 +29,7 @@
 #include <type_traits>
 #include <immintrin.h>  // for _mm_pause
 
-#include "ring_buffer_v2.1.hpp"
+#include "ring_buffer_v3.hpp"
 #include "thread_pinning.hpp"
 #include "tick.hpp"
 
