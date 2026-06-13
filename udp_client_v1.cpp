@@ -1,7 +1,8 @@
 // udp client// 11.06.26// ZeroK
 
-/*
- *
+/* workflow:
+        create socket -> bind -> recv()
+ * separate receiver and reporter threads
  * */
 
 #include <sys/types.h>
@@ -96,15 +97,6 @@ int main () {
         close (socketfd);
         return EXIT_FAILURE;
     }
-
-    // // 3. connect
-    // int result = connect (socketfd, res->ai_addr, res->ai_addrlen);
-    // if (result == -1) {
-    //     perror ("connect");
-    //     freeaddrinfo (res);
-    //     close (socketfd);
-    //     return EXIT_FAILURE;
-    // }
 
     
     freeaddrinfo (res);
