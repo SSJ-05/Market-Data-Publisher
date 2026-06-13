@@ -2,7 +2,11 @@
 
 /* workflow: 
       MDG thread -> ring buffer -> publisher thread -> UDP send() -> UDP client 
- * */
+ * bottleneck :  linux network stack that caps throughput to 134k ticks/s
+                 while "ring_buffer_v3" is capable of 40M ticks/s
+                 packets loss : 0.4%
+ * FIX: need to try DPDK for kernel bypass
+ */
 
 
 #include <sys/types.h>
