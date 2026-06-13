@@ -1,7 +1,7 @@
 // market data producer consumer mdp v3// 13.06.26// ZeroK
 
-/* MDG thread -> ring buffer -> publisher thread -> UDP send() -> UDP client 
- *
+/* workflow: 
+      MDG thread -> ring buffer -> publisher thread -> UDP send() -> UDP client 
  * */
 
 
