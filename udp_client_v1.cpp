@@ -25,6 +25,7 @@
 #include <chrono>
 
 #include "tick.hpp"
+#include "thread_pinning.hpp"
 
 
 
@@ -32,9 +33,12 @@ constexpr char SERVERPORT[] { "8888" };         // server's port client will be 
 constexpr char SERVADDR[]   { "127.0.0.1" };    // server's ip addr
 
 
-
+int socketfd = -1;
 volatile sig_atomic_t RUNNING { 1 };
-void sig_handler (int sig) { RUNNING = 0; }
+void sig_handler (int sig) { 
+    RUNNING = 0; 
+    shutdown (socketfd, SHUT_RDWR);
+}
 
 
 
@@ -62,49 +66,60 @@ int main () {
     addrinfo hints {}, *res;
     hints.ai_family     =   AF_INET;
     hints.ai_socktype   =   SOCK_DGRAM;
+    hints.ai_flags      =   AI_PASSIVE;
     
-    int rv = getaddrinfo (SERVADDR, SERVERPORT, &hints, &res);
+    int rv = getaddrinfo (nullptr, SERVERPORT, &hints, &res);
     if (rv != 0) {
         std::fprintf (stderr, "getaddrinfo: %s\n", gai_strerror(rv));  // getaddrinfo dont use errno/perror
         return EXIT_FAILURE;
     }
 
     // 1. create a socket
-    int socketfd = socket (res->ai_family, res->ai_socktype, res->ai_protocol);
+    socketfd = socket (res->ai_family, res->ai_socktype, res->ai_protocol);
     if (socketfd == -1) {
         perror ("socket");
         freeaddrinfo (res);
-        exit (EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
     std::printf("Client registered at fd %d\n", socketfd);
 
+    int buffer_size { 256 * 1024 };
+    setsockopt (socketfd, SOL_SOCKET, SO_RCVBUF, &buffer_size, sizeof(buffer_size));
+ 
+    int yes { 1 };
+    setsockopt (socketfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
 
-    // 2. connect
-    int result = connect (socketfd, res->ai_addr, res->ai_addrlen);
-    if (result == -1) {
-        perror ("connect");
-        freeaddrinfo (res);
+    // 2. bind
+    if ((bind (socketfd, res->ai_addr, res->ai_addrlen)) == -1) {
+        perror ("bind");
+        freeaddrinfo (res); 
         close (socketfd);
         return EXIT_FAILURE;
     }
+
+    // // 3. connect
+    // int result = connect (socketfd, res->ai_addr, res->ai_addrlen);
+    // if (result == -1) {
+    //     perror ("connect");
+    //     freeaddrinfo (res);
+    //     close (socketfd);
+    //     return EXIT_FAILURE;
+    // }
+
     
     freeaddrinfo (res);
-
-    constexpr int buffer_size { 256 * 1024 };
-    setsockopt (socketfd, SOL_SOCKET, SO_RCVBUF, &buffer_size, sizeof(buffer_size));
-    
+   
     /*******************************************************************************************************/
 
-
-    std::uint64_t expected  { 1 };
-
-    std::atomic<std::uint64_t> gaps           { 0 };
-    std::atomic<std::uint64_t> received       { 0 };
-    std::atomic<std::uint64_t> latency_ns     { 0 };
+    std::atomic<std::uint64_t> gaps           {};
+    std::atomic<std::uint64_t> received       {};
+    std::atomic<std::uint64_t> latency_ns     {};
 
 
     std::thread receiver ([&] () {
+        pin_thread (0);
         Tick tick {};
+        std::uint64_t expected  { 1 };
 
         while (RUNNING) {
 
@@ -114,7 +129,7 @@ int main () {
              
                 received.fetch_add (1, std::memory_order_relaxed);
                 
-                latency_ns.store (now_ns() - tick.timestamp_ns, std::memory_order_relaxed);
+                // latency_ns.store (now_ns() - tick.timestamp_ns, std::memory_order_relaxed);
 
                 if (tick.seq != expected) { 
                     gaps.fetch_add (1, std::memory_order_relaxed);
@@ -134,6 +149,7 @@ int main () {
     /*******************************************************************************************************/
 
     std::thread reporter ([&] () {
+        pin_thread (1);
         std::uint64_t prev_received  { 0 };
 
         while (RUNNING) {
@@ -146,20 +162,22 @@ int main () {
             prev_received  =  recv_now;
 
             std::printf ("received/s : %" PRIu64 "\n"
-                         "gaps       : %" PRIu64 "\n"
-                         "latency    : %" PRIu64 "\n\n",
+                         "gaps       : %" PRIu64 "\n",
+                         // "latency    : %" PRIu64 "\n\n",
                         recv_rate,
-                        gaps.load (std::memory_order_relaxed),
-                        latency_ns.load (std::memory_order_relaxed)
+                        gaps.load (std::memory_order_relaxed)
+                        // latency_ns.load (std::memory_order_relaxed)
                     );
         } // while
      });
 
     // shutdown on ctrl + c
-    shutdown (socketfd, SHUT_RDWR);
 
-    receiver.join(); reporter.join();
+    // let the worker threads catch up to main thread
+    receiver.join();
+    reporter.join();
 
+    // then close the socket
     close (socketfd);
 
     std::printf("\n\n=== Client terminated ===\n");
