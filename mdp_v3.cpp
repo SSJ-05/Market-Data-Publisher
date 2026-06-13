@@ -179,13 +179,6 @@ int main () {
     int yes { 1 };
     setsockopt (socketfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
 
-    // // 2. bind
-    // if ((bind (socketfd, res->ai_addr, res->ai_addrlen)) == -1) {
-    //     perror ("bind");
-    //     freeaddrinfo (res); 
-    //     close (socketfd);
-    //     return EXIT_FAILURE;
-    // }
 
     // 2. connect
     int result = connect (socketfd, res->ai_addr, res->ai_addrlen);
