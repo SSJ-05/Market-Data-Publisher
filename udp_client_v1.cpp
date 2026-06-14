@@ -1,4 +1,4 @@
-// udp client// 11.06.26// ZeroK
+// udp client v1// 11.06.26// ZeroK
 
 /* workflow:
         create socket -> bind -> recv()
@@ -84,11 +84,18 @@ int main () {
     }
     std::printf("Client registered at fd %d\n", socketfd);
 
-    int buffer_size { 256 * 1024 };
+    int buffer_size  { 4 * 1024 * 1024 };    // 4 MB
     setsockopt (socketfd, SOL_SOCKET, SO_RCVBUF, &buffer_size, sizeof(buffer_size));
  
-    int yes { 1 };
+    int yes  { 1 };
     setsockopt (socketfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
+
+    // tell kernel to busy poll NIC instead of waiting for interrupt
+    // reduce wake up latency
+    int busy_poll  { 50 };     // microsecs
+    setsockopt (socketfd, SOL_SOCKET, SO_BUSY_POLL, &busy_poll, sizeof(busy_poll));
+
+
 
     // 2. bind
     if ((bind (socketfd, res->ai_addr, res->ai_addrlen)) == -1) {

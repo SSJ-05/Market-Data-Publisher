@@ -177,12 +177,19 @@ int main () {
         exit (EXIT_FAILURE);
     }
 
-    int buffer_size { 256 * 1024 };
+
+    // 4 MB - increase the buffer size to reduce the drops
+    int buffer_size { 4 * 1024 * 1024 };    
     setsockopt (socketfd, SOL_SOCKET, SO_SNDBUF, &buffer_size, sizeof(buffer_size));
  
     int yes { 1 };
     setsockopt (socketfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
 
+
+    // set priority from 0-6 for kernel to order networking queues
+    // reduces queuing delays inside kernel scheduler
+    int priority  { 6 };            
+    setsockopt (socketfd, SOL_SOCKET, SO_PRIORITY, &priority, sizeof(priority));
 
     // 2. connect
     int result = connect (socketfd, res->ai_addr, res->ai_addrlen);
