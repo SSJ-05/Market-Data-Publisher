@@ -187,7 +187,7 @@ int main () {
 
 
     // set priority from 0-6 for kernel to order networking queues
-    // reduces queuing delays inside kernel scheduler
+    // reduces queuing delays inside kernel queues (read qdisc)
     int priority  { 6 };            
     setsockopt (socketfd, SOL_SOCKET, SO_PRIORITY, &priority, sizeof(priority));
 
