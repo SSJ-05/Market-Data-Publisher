@@ -4,6 +4,6 @@
 
 #include <csignal>
 
-extern volatile sig_atomic_t RUNNING;
+extern volatile sig_atomic_t g_RUNNING;
 
 void sig_handler (int sig);

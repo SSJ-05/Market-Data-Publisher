@@ -185,8 +185,8 @@ static void pool_stats (rte_mempool* pool) {
 }
 
 
-// // port init
-// std::uint16_t dpdk::init (int argc, char** argv) {
-//
-//     return port_id;
-// }
+// port init
+Port dpdk::init (int argc, char** argv) {
+
+    return port_id;
+}

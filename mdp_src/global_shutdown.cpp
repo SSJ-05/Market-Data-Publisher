@@ -2,6 +2,6 @@
 
 #include "global_shutdown.hpp"
 
-volatile sig_atomic_t RUNNING { 1 };
+volatile sig_atomic_t g_RUNNING { 1 };
 
-void sig_handler (int sig) { RUNNING = 0; }
+void sig_handler (int sig) { g_RUNNING = 0; }
