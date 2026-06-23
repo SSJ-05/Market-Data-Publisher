@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <cstdint>
+
 struct alignas(64) Tick {
 
     std::uint64_t seq;               // client needs sequence number to detect packet loss
@@ -15,8 +17,8 @@ struct alignas(64) Tick {
     std::uint32_t bid_qty;
     std::uint32_t ask_qty;
 
-    char symbol[8];
-    char pad[16];                   // make the size of Tick to 64 byte
+    char symbol [8];
+    char reserved [16];               // make the size of Tick to 64 byte
 
 };
 
