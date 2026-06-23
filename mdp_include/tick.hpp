@@ -2,6 +2,8 @@
 // will be used by both client and server
 
 
+#pragma once
+
 struct alignas(64) Tick {
 
     std::uint64_t seq;               // client needs sequence number to detect packet loss

@@ -4,7 +4,7 @@
 #include "tick.hpp"
 #include "packet.hpp"
 
-Packet build_pkt (const Tick& _tick) {
+Packet pkt_builder::build_pkt (const Tick& _tick) {
     
     Packet pkt {};
     pkt.tick = _tick;

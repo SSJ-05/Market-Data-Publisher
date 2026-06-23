@@ -36,6 +36,9 @@ namespace cfg {
     constexpr std::uint16_t  PORT_ID      { 0 };
 
     static_assert (NUM_MBUFS >= 2 * TX_DESC, "INCREASE THE BUFFER SIZE.\n");
+    static_assert (TX_DESC <= UINT16_MAX, "TX_DESC overflow");
+    static_assert (RX_DESC <= UINT16_MAX, "RX_DESC overflow");
+    static_assert (NUM_MBUFS <= UINT16_MAX, "NUM_MBUFS overflow");
 }
 
 

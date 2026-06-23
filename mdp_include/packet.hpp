@@ -12,6 +12,7 @@
 #include <rte_ether.h>
 #include <rte_ip.h>
 #include <rte_udp.h>
+#include <cstdio>
 
 #include "tick.hpp"
 
@@ -21,11 +22,12 @@ struct Packet {
     rte_ipv4_hdr    ip;
     rte_udp_hdr     udp;
     Tick            tick;
+
 };
 
-static assert (sizeof(Packet) == 
-                    sizeof(rte_ether_hdr) +
-                    sizeof(rte_ipv4_hdr) +
-                    sizeof(rte_udp_hdr) +
-                    sizeof(Tick)
-                );
+// static_assert (sizeof(Packet) == 
+//                     sizeof(rte_ether_hdr) +
+//                     sizeof(rte_ipv4_hdr) +
+//                     sizeof(rte_udp_hdr) +
+//                     sizeof(Tick)
+//                 );

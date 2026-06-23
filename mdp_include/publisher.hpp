@@ -6,6 +6,7 @@
 #include "dpdk_port.hpp"
 #include "ring_buffer_v3.hpp"
 #include "tick.hpp"
+#include "packet_builder.hpp"
 
 namespace publisher {
 

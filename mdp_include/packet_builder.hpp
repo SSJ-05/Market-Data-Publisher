@@ -4,4 +4,7 @@
 
 #include "packet.hpp"
 
-Packet build_pkt (const Tick& tick);
+namespace pkt_builder {
+
+    Packet build_pkt (const Tick& tick);
+}
