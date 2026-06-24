@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# script to setup dpdk dev env, 14.06.26, ZeroK
+
+
+set -e
+
+echo "=== DPDK Environment Setup ==="
+
+# 1. hugepages
+echo "Allocating hugepages..."
+echo 512 | sudo tee /proc/sys/vm/nr_hugepages
+echo "HugePages_Total: $(grep HugePages_Total /proc/meminfo | awk '{print $2}')"
+
+
+
+# 2. mount hugetlfs
+if mount | grep -q hugetlbfs; then
+    echo "hugetlbfs already mounted"
+else
+    echo "Mounting hugetlbfs..."
+    sudo mkdir -p /dev/hugepages
+    sudo mount -t hugetlbfs nodev /dev/hugepages
+fi
+
+
+# 3. load uio module
+# echo "Loading uio_pci_generic..."
+echo "Loading vfio-pci..."
+# sudo modprobe uio_pci_generic
+sudo modprobe vfio-pci
+
+
+
+# 4. bring down NIC
+echo "Bringing down eno1..."
+sudo ip link set eno1 down
+
+
+# 5. bind NIC
+echo "Binding NIC to vfio-pci..."
+# sudo dpdk-devbind.py --bind=uio_pci_generic 0000:02:00.0
+sudo dpdk-devbind.py --bind=vfio-pci 0000:02:00.0
+
+
+
+# 6. verify
+echo ""
+echo "=== Verification ==="
+sudo dpdk-devbind.py --status | grep -A2 "DPDK-compatible"
+echo "Hugepages: $(grep HugePages_Free /proc/meminfo)"
+echo ""
+echo "=== Ready ==="
+
