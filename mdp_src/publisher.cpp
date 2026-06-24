@@ -4,9 +4,9 @@
 
 /* this file contains
  * ring.pop()
+ * header template pre built
  * burst assembly
  * mbuf alloc
- * tick to packet conversion
  * tx_burst
  * stats
  * */
@@ -24,29 +24,29 @@
 
 #include <atomic>
 #include <cstdint>
+#include <cstddef>  // for std::byte
+#include <cstdio>
 
-
-namespace cfg {
-    
-    constexpr std::uint16_t PKT_SIZE {  sizeof(rte_ether_hdr) +
-                                        sizeof(rte_ipv4_hdr) +
-                                        sizeof(rte_udp_hdr) +
-                                        sizeof(Tick) };
-
-    constexpr std::uint16_t BURST_SIZE { 1 << 5 };     // 32 batch size
-
-    static_assert (BURST_SIZE <= 64, "BURST_SIZE TOO LARGE\n");
-    static_assert (PKT_SIZE == sizeof(Hdr_template) + sizeof(Tick));
-}
 
 
 
 // counters for stats
-alignas(64) std::atomic<std::size_t> sent_pkts {};
-// char pad_0 [64 - sizeof(std::atomic<std::size_t>)];
+namespace counters {
 
-alignas(64) std::atomic<std::size_t> dropped_pkts {};
-// char pad_1 [64 - sizeof(std::atomic<std::size_t>)];
+    alignas(64) std::atomic<std::size_t> sent_pkts {};
+    // char pad_0 [64 - sizeof(std::atomic<std::size_t>)];
+
+    alignas(64) std::atomic<std::size_t> dropped_pkts {};
+    // char pad_1 [64 - sizeof(std::atomic<std::size_t>)];
+
+
+    void get_publisher_stats () noexcept {
+
+        std::printf ("sent: %zu\n" "dropped: %zu\n\n",
+                sent_pkts.load (std::memory_order_relaxed),
+                dropped_pkts.load (std::memory_order_relaxed));
+    }
+}   // namespace counters
 
 
 
@@ -58,10 +58,11 @@ struct Hdr_template {
     rte_udp_hdr    udp;
 };
 static_assert (sizeof(Hdr_template) == 42);
-
+static_assert (cfg::PKT_SIZE == sizeof(Hdr_template) + sizeof(Tick));
 
 
 // helper func - header builder - private to this file
+// prebuild headers - then memcpy payload into mbuf
 static Hdr_template build_template() {
    
     Hdr_template hdr {};
@@ -98,17 +99,19 @@ static Hdr_template build_template() {
 
 
 // helper func - burst builder - private to this file
+// A A M M - Alloc Append Mtod Memcpy
 [[ nodiscard ]]
 static std::uint16_t build_burst (  rte_mempool* pool,
                                     const Hdr_template& hdr,
                                     Tick ticks[],          
                                     rte_mbuf* pkts[],       
-                                    std::uint16_t count) {
+                                    std::uint16_t count ) {
 
     std::uint16_t built {};
+
     for (; built < count; ++built) {
 
-        auto* pkt  = rte_pktmbuf_alloc (pool);
+        auto* pkt = rte_pktmbuf_alloc (pool);
         if (!pkt) break;
 
         void* dst = rte_pktmbuf_append (pkt, cfg::PKT_SIZE);
@@ -121,11 +124,25 @@ static std::uint16_t build_burst (  rte_mempool* pool,
         
         __builtin_memcpy (eth, &hdr, sizeof(Hdr_template));
 
+
+        // // nested cast - intent: this memory is both tck and eth
+        // // cast 8bit int ptr on eth
+        // // move the eth ptr forward by Hdr_template size
+        // // cast Tick ptr to the new mem location
         auto* tck = reinterpret_cast<Tick*>(
                             reinterpret_cast<std::uint8_t*>(eth)
                             + sizeof(Hdr_template));
+        // // or 
+        // auto* payload = reinterpret_cast<std::byte*>(eth) + sizeof(Hdr_template);
+        // Tick* tck = reinterpret_cast<Tick*>(payload);
 
         *tck = ticks[built];
+
+        // using a reinterpret_casted *tick causes UB as per C++ coz 
+        // no Tick obj exists in raw memory returned by mtod
+        // alternative - placement-new
+        // std::byte* payload = reinterpret_cast<std::byte*>(eth) + sizeof(Hdr_template);
+        // Tick* tick = new (payload) Tick (ticks[built]);
 
         pkts[built] = pkt;
     }
@@ -174,6 +191,16 @@ void publisher::run (dpdk::Port& port,
             continue;
         }
 
+        // cleanup tx queue
+        std::uint16_t cleaned =
+            rte_eth_tx_done_cleanup (
+                    port.port_id,
+                    0, 
+                    64 
+                );
+        if (cleaned) 
+            std::printf ("cleaned : %u\n", cleaned);
+
         auto sent =
             rte_eth_tx_burst (
                     port.port_id,
@@ -182,12 +209,19 @@ void publisher::run (dpdk::Port& port,
                     built
                 );
 
+
         for (auto i {sent}; i < built; ++i) {
             rte_pktmbuf_free (bc.pkts[i]);
         }
 
         // increment counters
-        sent_pkts.fetch_add (sent, std::memory_order_relaxed);
-        dropped_pkts.fetch_add (built - sent, std::memory_order_relaxed);
+        counters::sent_pkts.fetch_add (sent, std::memory_order_relaxed);
+        counters::dropped_pkts.fetch_add (built - sent, std::memory_order_relaxed);
+
     }
+    
 }
+
+
+
+

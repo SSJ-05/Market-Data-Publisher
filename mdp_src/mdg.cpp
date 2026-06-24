@@ -3,7 +3,7 @@
 #include "mdg.hpp"
 #include <immintrin.h>  // for rdtsc
 
-Tick mdg::generate () {
+Tick MDG::generate () {
 
     Tick tick {};
 
@@ -14,7 +14,7 @@ Tick mdg::generate () {
     tick.ask = 101.00;
 
     tick.bid_qty = 20;
-    tick.bid_ask = 30;
+    tick.bid_qty = 30;
 
     __builtin_memcpy (tick.symbol, "AAPL", 5);
 

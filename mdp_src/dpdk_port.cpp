@@ -9,7 +9,6 @@
  * rx/tx queue setup
  * start port
  * shutdown (stop port, close port, eal cleanup)
- * pool stats printer
  * */
 
 
@@ -36,9 +35,6 @@ namespace cfg {
     constexpr std::uint16_t  PORT_ID      { 0 };
 
     static_assert (NUM_MBUFS >= 2 * TX_DESC, "INCREASE THE BUFFER SIZE.\n");
-    static_assert (TX_DESC <= UINT16_MAX, "TX_DESC overflow");
-    static_assert (RX_DESC <= UINT16_MAX, "RX_DESC overflow");
-    static_assert (NUM_MBUFS <= UINT16_MAX, "NUM_MBUFS overflow");
 }
 
 
@@ -100,8 +96,8 @@ static rte_mempool* create_mempool (std::uint16_t buf_size,
 }
 
 
-// create RX Queue
-static rte_mempool* create_rx_pool (std::uint16_t desc_sz) {
+// create RX Queue and rx_pool
+static rte_mempool* create_rx_pool_q (std::uint16_t desc_sz) {
     
     auto* rx_pool = 
         create_mempool (cfg::NUM_MBUFS, cfg::CACHE_SIZE, "rx_pool");
@@ -157,17 +153,32 @@ static void start_port () {
 
     int ret = rte_eth_dev_start (cfg::PORT_ID);
     if (ret < 0) rte_exit (EXIT_FAILURE, "ETH DEV START FAILED\n");
+
+    rte_delay_ms (3000);
+
+    rte_eth_link link {};
+
+    ret = rte_eth_link_get_nowait (cfg::PORT_ID, &link);
+
+    std::printf("ret : %u "
+        "link_status=%s speed=%u duplex=%u\n",
+        ret,
+        link.link_status ? "UP" : "DOWN",
+        link.link_speed,
+        link.link_duplex
+    );
+
 }
 
 
 
 // stop dev, close port, cleanup EAL
-void dpdk::shutdown (std::uint16_t port_id) {
+void dpdk::shutdown (const Port& port) {
     
-    int ret = rte_eth_dev_stop (port_id);
+    int ret = rte_eth_dev_stop (port.port_id);
     if (ret < 0) rte_exit (EXIT_FAILURE, "ETH DEV STOP FAILED\n");
 
-    ret = rte_eth_dev_close (port_id);
+    ret = rte_eth_dev_close (port.port_id);
     if (ret < 0) rte_exit (EXIT_FAILURE, "ETH DEV CLOSE FAILED\n");
 
     ret = rte_eal_cleanup();
@@ -175,18 +186,35 @@ void dpdk::shutdown (std::uint16_t port_id) {
 }
 
 
-// check pool availability
-static void pool_stats (rte_mempool* pool) {
-
-    std::printf ("\navailable mempool: %u\n"
-                 "in use mempool   : %u\n\n",
-                 rte_mempool_avail_count (pool),
-                 rte_mempool_in_use_count (pool));
-}
 
 
 // port init
-Port dpdk::init (int argc, char** argv) {
+// bring dpdk online - eal init
+// discover port
+// configure port
+// create mempools
+// create tx/rx queues
+// start port
+dpdk::Port dpdk::init (int argc, char** argv) {
 
-    return port_id;
+    eal_init (argc, argv);
+
+    auto port_id = discover_port ();
+
+    port_config ();
+
+    auto* rx_pool = create_rx_pool_q (cfg::RX_DESC);
+    auto* tx_pool = create_mempool (
+                            cfg::NUM_MBUFS,
+                            cfg::CACHE_SIZE,
+                            "tx_pool");
+    create_tx_q (cfg::TX_DESC);
+
+    start_port ();
+
+    return dpdk::Port {
+             .port_id = port_id,
+             .tx_pool = tx_pool,
+             .rx_pool = rx_pool 
+            };
 }
