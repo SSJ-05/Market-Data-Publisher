@@ -3,7 +3,10 @@
 #pragma once
 
 #include <cstdint>
+#include <atomic>
 #include "tick.hpp"
+
+extern std::atomic<std::size_t> produced_ticks;
 
 class MDG {
 private:
@@ -12,3 +15,4 @@ private:
 public:
     Tick generate ();
 };
+

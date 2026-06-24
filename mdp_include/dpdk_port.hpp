@@ -4,6 +4,7 @@
 
 #include <cstdint>
 
+// fwd declaration
 struct rte_mempool;
 
 namespace dpdk {
@@ -15,10 +16,9 @@ namespace dpdk {
         rte_mempool*    rx_pool     {};
     };
 
+    [[ nodiscard ]]
     Port init (int argc, char** argv);
-    // std::uint16_t init (int argc, char** argv);
 
-    void shutdown (Port& port);
-    // void shutdown (std::uint16_t port_id);
+    void shutdown (const Port& port);
 
 } // namespace dpdk

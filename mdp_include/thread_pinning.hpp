@@ -4,6 +4,9 @@
 
 #include <pthread.h>
 #include <sched.h>
+#include <cstdlib>
+#include <cstdio>
+#include <cerrno>
 
 // thread pinning helper func
 void pin_thread (int cpu_id) {
@@ -15,7 +18,7 @@ void pin_thread (int cpu_id) {
 
     if (rc != 0) {
         perror("Error: pthread_setaffinity_np\n");
-        std::terminate();
+        exit (EXIT_FAILURE);
     }
 }
 
