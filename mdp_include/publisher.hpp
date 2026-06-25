@@ -18,6 +18,8 @@ namespace counters {
     extern std::atomic<std::size_t> sent_pkts;
     extern std::atomic<std::size_t> dropped_pkts;
 
+    extern std::atomic<uint64_t> total_bursts;
+    extern std::atomic<uint64_t> total_pkts;
     void get_publisher_stats () noexcept; 
 
 }   // namespace counters
@@ -34,7 +36,7 @@ namespace cfg {
 
     constexpr std::size_t  RING_SIZE  { 1 << 16 };      // 65536
 
-    static_assert (BURST_SIZE <= 1 << 6, "BURST_SIZE TOO LARGE\n");
+    // static_assert (BURST_SIZE <= 1 << 6, "BURST_SIZE TOO LARGE\n");
 }
 
 

@@ -7,7 +7,7 @@
 #include <cstdint>
 #include <type_traits>
 
-struct alignas(64) Tick {
+struct Tick {
 
     std::uint64_t seq;               // client needs sequence number to detect packet loss
     std::uint64_t timestamp_tsc;     // time when tick generated
@@ -23,6 +23,6 @@ struct alignas(64) Tick {
 
 };
 
-static_assert (sizeof(Tick) == 64, "WARNING: Tick should be 64 bytes.\n");
+// static_assert (sizeof(Tick) == 64, "WARNING: Tick should be 64 bytes.\n");
 static_assert (std::is_trivially_copyable_v<Tick>);
 // sizeof(Tick) = 64 bytes

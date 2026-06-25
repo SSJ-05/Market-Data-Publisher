@@ -10,7 +10,7 @@ extern std::atomic<std::size_t> produced_ticks;
 
 class MDG {
 private:
-    std::uint64_t _seq {};
+    std::uint64_t _seq { 1 };
 
 public:
     Tick generate ();
