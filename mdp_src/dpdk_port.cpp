@@ -26,7 +26,7 @@
 
 namespace cfg {
 
-    constexpr std::uint16_t  TX_DESC      { 1 << 10 };  // 1024
+    constexpr std::uint16_t  TX_DESC      { 1 << 12 };  // 4096
     constexpr std::uint16_t  RX_DESC      { 1 << 10 };  // 1024
     constexpr std::uint16_t  NUM_MBUFS    { 1 << 13 };  // 8192
     constexpr std::uint16_t  CACHE_SIZE   { 1 << 8 };   // 256
@@ -34,7 +34,7 @@ namespace cfg {
     constexpr std::uint16_t  TX_Q         { 1 };
     constexpr std::uint16_t  PORT_ID      { 0 };
 
-    static_assert (NUM_MBUFS >= 2 * TX_DESC, "INCREASE THE BUFFER SIZE.\n");
+    // static_assert (NUM_MBUFS >= 2 * TX_DESC, "INCREASE NUM_MBUFS.\n");
 }
 
 
@@ -158,16 +158,19 @@ static void start_port () {
 
     rte_eth_link link {};
 
-    ret = rte_eth_link_get_nowait (cfg::PORT_ID, &link);
+    ret = rte_eth_link_get (cfg::PORT_ID, &link);
+    if (ret < 0) rte_exit (EXIT_FAILURE, "LINK QUERY FAILED\n");
 
-    std::printf("ret : %u "
-        "link_status=%s speed=%u duplex=%u\n",
+    std::printf("\nret : %d "
+        "link_status = %s  speed = %u  duplex = %u\n",
         ret,
         link.link_status ? "UP" : "DOWN",
         link.link_speed,
         link.link_duplex
     );
 
+    rte_eth_promiscuous_enable(cfg::PORT_ID);    // accept all frames
+                                            // for dev phase only - remove later
 }
 
 

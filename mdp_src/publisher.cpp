@@ -39,9 +39,11 @@ namespace counters {
     alignas(64) std::atomic<std::size_t> dropped_pkts {};
     // char pad_1 [64 - sizeof(std::atomic<std::size_t>)];
 
+    std::atomic<uint64_t> total_bursts{};
+    std::atomic<uint64_t> total_pkts{};
 
+    
     void get_publisher_stats () noexcept {
-
         std::printf ("sent: %zu\n" "dropped: %zu\n\n",
                 sent_pkts.load (std::memory_order_relaxed),
                 dropped_pkts.load (std::memory_order_relaxed));
@@ -129,6 +131,7 @@ static std::uint16_t build_burst (  rte_mempool* pool,
         // // cast 8bit int ptr on eth
         // // move the eth ptr forward by Hdr_template size
         // // cast Tick ptr to the new mem location
+        // acceptable for trivially copyable obj
         auto* tck = reinterpret_cast<Tick*>(
                             reinterpret_cast<std::uint8_t*>(eth)
                             + sizeof(Hdr_template));
@@ -137,12 +140,6 @@ static std::uint16_t build_burst (  rte_mempool* pool,
         // Tick* tck = reinterpret_cast<Tick*>(payload);
 
         *tck = ticks[built];
-
-        // using a reinterpret_casted *tick causes UB as per C++ coz 
-        // no Tick obj exists in raw memory returned by mtod
-        // alternative - placement-new
-        // std::byte* payload = reinterpret_cast<std::byte*>(eth) + sizeof(Hdr_template);
-        // Tick* tick = new (payload) Tick (ticks[built]);
 
         pkts[built] = pkt;
     }
@@ -191,16 +188,6 @@ void publisher::run (dpdk::Port& port,
             continue;
         }
 
-        // cleanup tx queue
-        std::uint16_t cleaned =
-            rte_eth_tx_done_cleanup (
-                    port.port_id,
-                    0, 
-                    64 
-                );
-        if (cleaned) 
-            std::printf ("cleaned : %u\n", cleaned);
-
         auto sent =
             rte_eth_tx_burst (
                     port.port_id,
@@ -213,6 +200,20 @@ void publisher::run (dpdk::Port& port,
         for (auto i {sent}; i < built; ++i) {
             rte_pktmbuf_free (bc.pkts[i]);
         }
+
+
+        // // cleanup tx queue
+        // std::uint16_t cleaned =
+        //     rte_eth_tx_done_cleanup (
+        //             port.port_id,
+        //             0, 
+        //             64 
+        //         );
+        // if (cleaned) 
+        //     std::printf ("cleaned : %u\n", cleaned);
+
+        // counters::total_bursts.fetch_add(1);
+        // counters::total_pkts.fetch_add(built);
 
         // increment counters
         counters::sent_pkts.fetch_add (sent, std::memory_order_relaxed);

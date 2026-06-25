@@ -38,7 +38,12 @@
 #include <csignal>
 #include <cstdio>
 #include <immintrin.h>
+#include <inttypes.h>
+#include <rte_ethdev.h>
 
+
+
+constexpr uint64_t TARGET_PPS = 5'00'000;    // tested limit
 
 // check pool availability
 static void pool_stats (rte_mempool* pool) {
@@ -64,18 +69,22 @@ int main (int argc, char** argv) {
 
     MDG gen;
 
+
+    auto next = std::chrono::steady_clock::now();
     std::thread producer_thread ([&] () {
             pin_thread (0);
 
             while (g_RUNNING) {
-                
                 Tick tick = gen.generate ();
 
                 while(!ring.push (tick)) {
                     if (!g_RUNNING) return;
                     _mm_pause();
                 }
+next += std::chrono::nanoseconds(
+        1'000'000'000ULL / TARGET_PPS);
 
+    std::this_thread::sleep_until(next);
                 // increment counter
                 produced_ticks.fetch_add (1, std::memory_order_relaxed);
             }
@@ -117,7 +126,38 @@ int main (int argc, char** argv) {
         prev_sent = sent;
         prev_drop = drop;
 
+        // std::printf ("avg sent: %zu / %zu\n",
+        //         counters::total_pkts.load(),
+        //         counters::total_bursts.load());
+
+        rte_eth_stats stats{};
+        rte_eth_stats_get(port.port_id, &stats);
+
+        printf(
+            "opackets = %" PRIu64
+            " oerrors = %" PRIu64
+            " obytes = %" PRIu64 "\n",
+            stats.opackets,
+            stats.oerrors,
+            stats.obytes
+        );
+
         pool_stats (port.tx_pool);
+
+        //     std::uint64_t prev_received  {};
+        //     auto recv_now  =  counters::received.load (std::memory_order_relaxed);
+        //     auto recv_rate =  recv_now - prev_received; 
+        //
+        //     prev_received  =  recv_now;
+        //
+        //     std::printf ("received/s : %" PRIu64 "\n"
+        //                  "gaps       : %" PRIu64 "\n"
+        //                  "latency    : %" PRIu64 "\n\n",
+        //                 recv_rate,
+        //                 counters::gaps.load (std::memory_order_relaxed)
+        //                 counters::latency_cycles.load (std::memory_order_relaxed)
+        //             );
+
     }
 
 
