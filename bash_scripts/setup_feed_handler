@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# feed handler setup, 26.06.26, ZeroK
+# connect to publisher
+
+sudo ip link set enx00e04c334398 up
+
+sudo ip addr flush dev enx00e04c334398
+sudo ip addr add 10.10.10.2/24 dev enx00e04c334398
+
+sudo ip addr show enx00e04c334398
+

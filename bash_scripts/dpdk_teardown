@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# teardown script - restore NIC to kernel after dpdk dev
+# 14.06.26, ZeroK
+
+set -e
+
+echo "=== DPDK Teardown ==="
+
+# rebind NIC to kernel
+sudo dpdk-devbind.py --bind=r8169 0000:02:00.0
+
+
+# bring interface back
+sudo ip link set eno1 up
+sleep 1
+ip link show eno1 | grep -q "UP" && echo "eno1 is up" || echo "WARNING: eno1 is still down"
+
+
+# release hugepages
+echo 0 | sudo tee /proc/sys/vm/nr_hugepages
+
+echo "=== NIC restored to kernel ==="
+sudo dpdk-devbind.py --status | grep -A2 "kernel driver"

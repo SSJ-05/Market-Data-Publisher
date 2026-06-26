@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# teardown script for feed handler, 26.06.26, ZeroK
+
+
+sudo ip addr flush dev enxx00e04c334398
+sudo ip link set enxx00e04c334398 down
+

@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# teardown script for publisher, 26.06.26, ZeroK
+
+
+sudo ip addr flush dev eno1
+sudo ip link set eno1 down

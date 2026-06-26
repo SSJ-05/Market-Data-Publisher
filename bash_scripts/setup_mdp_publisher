@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# pubisher setup script, 26.06.26, ZeroK
+# connect publisher to feed handler
+
+sudo ip link set eno1 up
+
+sudo ip addr flush dev eno1
+sudo ip addr add 10.10.10.1/24 dev eno1
+
+ip addr show eno1
